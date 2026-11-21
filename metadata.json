@@ -1,0 +1,8 @@
+{
+  "name": "FolioForge",
+  "description": "Fast, secure PDF and image tools workspace with merge, split, compress, Word conversion, image conversion, usage tracking, subscriptions, and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

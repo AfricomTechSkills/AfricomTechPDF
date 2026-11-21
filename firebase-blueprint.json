@@ -1,0 +1,347 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Registered FolioForge user account, subscription tier, and daily usage state.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin"]
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["free", "pro", "business"]
+        },
+        "billingCycle": {
+          "type": "string",
+          "enum": ["monthly", "annual"]
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "enum": ["active", "canceled", "past_due"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"]
+        },
+        "dailyUsageDate": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "dailyUsageCount": {
+          "type": "integer"
+        },
+        "totalOperations": {
+          "type": "integer"
+        },
+        "totalBytesProcessed": {
+          "type": "integer"
+        },
+        "totalBytesSaved": {
+          "type": "integer"
+        },
+        "paymentMethodLast4": {
+          "type": "string",
+          "maxLength": 4
+        },
+        "paymentMethodBrand": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "currentPeriodEnd": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "role",
+        "plan",
+        "billingCycle",
+        "subscriptionStatus",
+        "status",
+        "dailyUsageDate",
+        "dailyUsageCount",
+        "totalOperations",
+        "totalBytesProcessed",
+        "totalBytesSaved",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UsageLog": {
+      "title": "UsageLog",
+      "description": "Immutable record of a PDF or image tool execution.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userEmail": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "toolId": {
+          "type": "string",
+          "enum": [
+            "merge-pdf",
+            "split-pdf",
+            "compress-pdf",
+            "pdf-to-image",
+            "image-to-pdf",
+            "pdf-to-word",
+            "word-to-pdf",
+            "image-convert"
+          ]
+        },
+        "toolName": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "fileName": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "fileCount": {
+          "type": "integer"
+        },
+        "inputBytes": {
+          "type": "integer"
+        },
+        "outputBytes": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "integer"
+        },
+        "dateKey": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "failed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "userEmail",
+        "toolId",
+        "toolName",
+        "fileName",
+        "fileCount",
+        "inputBytes",
+        "outputBytes",
+        "durationMs",
+        "dateKey",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Subscription billing invoice and receipt record.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userEmail": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["pro", "business"]
+        },
+        "billingCycle": {
+          "type": "string",
+          "enum": ["monthly", "annual"]
+        },
+        "amountCents": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["paid", "refunded", "void"]
+        },
+        "paymentLast4": {
+          "type": "string",
+          "maxLength": 4
+        },
+        "periodLabel": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "userEmail",
+        "invoiceNumber",
+        "plan",
+        "billingCycle",
+        "amountCents",
+        "currency",
+        "status",
+        "paymentLast4",
+        "periodLabel",
+        "createdAt"
+      ]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Global SaaS limits, pricing, and tool availability configured by administrators.",
+      "type": "object",
+      "properties": {
+        "freeDailyLimit": {
+          "type": "integer"
+        },
+        "maxFreeFileMb": {
+          "type": "integer"
+        },
+        "maxProFileMb": {
+          "type": "integer"
+        },
+        "maintenanceMode": {
+          "type": "boolean"
+        },
+        "disabledTools": {
+          "type": "array"
+        },
+        "proMonthlyPriceCents": {
+          "type": "integer"
+        },
+        "proAnnualPriceCents": {
+          "type": "integer"
+        },
+        "businessMonthlyPriceCents": {
+          "type": "integer"
+        },
+        "businessAnnualPriceCents": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "freeDailyLimit",
+        "maxFreeFileMb",
+        "maxProFileMb",
+        "maintenanceMode",
+        "disabledTools",
+        "proMonthlyPriceCents",
+        "proAnnualPriceCents",
+        "businessMonthlyPriceCents",
+        "businessAnnualPriceCents",
+        "updatedAt",
+        "updatedBy"
+      ]
+    },
+    "AdminGrant": {
+      "title": "AdminGrant",
+      "description": "Trusted administrator role marker document keyed by user UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "grantedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile, subscription plan, and daily tool usage tracking."
+    },
+    "/usageLogs/{logId}": {
+      "schema": { "$ref": "#/entities/UsageLog" },
+      "description": "Append-only tool execution logs for user dashboard and admin analytics."
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Subscription invoices and payment receipts."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/PlatformSettings" },
+      "description": "Global platform configuration (e.g. /settings/platform)."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminGrant" },
+      "description": "Trusted admin grant documents."
+    }
+  }
+}

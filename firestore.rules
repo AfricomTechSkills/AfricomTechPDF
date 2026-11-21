@@ -1,0 +1,306 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'ndubuisichuks22@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation helpers
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+        'uid', 'email', 'displayName', 'role', 'plan', 'billingCycle',
+        'subscriptionStatus', 'status', 'dailyUsageDate', 'dailyUsageCount',
+        'totalOperations', 'totalBytesProcessed', 'totalBytesSaved',
+        'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid', 'email', 'displayName', 'photoURL', 'role', 'plan', 'billingCycle',
+        'subscriptionStatus', 'status', 'dailyUsageDate', 'dailyUsageCount',
+        'totalOperations', 'totalBytesProcessed', 'totalBytesSaved',
+        'paymentMethodLast4', 'paymentMethodBrand', 'currentPeriodEnd',
+        'createdAt', 'updatedAt'
+      ]) &&
+      isValidId(data.uid) &&
+      data.email is string && data.email.size() >= 3 && data.email.size() <= 256 &&
+      data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 128 &&
+      (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 512)) &&
+      data.role in ['user', 'admin'] &&
+      data.plan in ['free', 'pro', 'business'] &&
+      data.billingCycle in ['monthly', 'annual'] &&
+      data.subscriptionStatus in ['active', 'canceled', 'past_due'] &&
+      data.status in ['active', 'suspended'] &&
+      data.dailyUsageDate is string && data.dailyUsageDate.size() == 10 &&
+      data.dailyUsageDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      data.dailyUsageCount is int && data.dailyUsageCount >= 0 && data.dailyUsageCount <= 100000 &&
+      data.totalOperations is int && data.totalOperations >= 0 && data.totalOperations <= 10000000 &&
+      data.totalBytesProcessed is int && data.totalBytesProcessed >= 0 &&
+      data.totalBytesSaved is int && data.totalBytesSaved >= 0 &&
+      (!('paymentMethodLast4' in data) || (data.paymentMethodLast4 is string && data.paymentMethodLast4.size() <= 4)) &&
+      (!('paymentMethodBrand' in data) || (data.paymentMethodBrand is string && data.paymentMethodBrand.size() <= 32)) &&
+      (!('currentPeriodEnd' in data) || (data.currentPeriodEnd is string && data.currentPeriodEnd.size() <= 40)) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidUsageLog(data) {
+      return data.keys().hasAll([
+        'userId', 'userEmail', 'toolId', 'toolName', 'fileName',
+        'fileCount', 'inputBytes', 'outputBytes', 'durationMs',
+        'dateKey', 'status', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'userEmail', 'toolId', 'toolName', 'fileName',
+        'fileCount', 'inputBytes', 'outputBytes', 'durationMs',
+        'dateKey', 'status', 'createdAt'
+      ]) &&
+      isValidId(data.userId) &&
+      data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 256 &&
+      data.toolId in [
+        'merge-pdf', 'split-pdf', 'compress-pdf', 'pdf-to-image',
+        'image-to-pdf', 'pdf-to-word', 'word-to-pdf', 'image-convert'
+      ] &&
+      data.toolName is string && data.toolName.size() >= 1 && data.toolName.size() <= 64 &&
+      data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 256 &&
+      data.fileCount is int && data.fileCount >= 1 && data.fileCount <= 100 &&
+      data.inputBytes is int && data.inputBytes >= 0 &&
+      data.outputBytes is int && data.outputBytes >= 0 &&
+      data.durationMs is int && data.durationMs >= 0 && data.durationMs <= 600000 &&
+      data.dateKey is string && data.dateKey.size() == 10 &&
+      data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      data.status in ['completed', 'failed'] &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll([
+        'userId', 'userEmail', 'invoiceNumber', 'plan', 'billingCycle',
+        'amountCents', 'currency', 'status', 'paymentLast4', 'periodLabel', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId', 'userEmail', 'invoiceNumber', 'plan', 'billingCycle',
+        'amountCents', 'currency', 'status', 'paymentLast4', 'periodLabel', 'createdAt'
+      ]) &&
+      isValidId(data.userId) &&
+      data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 256 &&
+      data.invoiceNumber is string && data.invoiceNumber.size() >= 3 && data.invoiceNumber.size() <= 32 &&
+      data.plan in ['pro', 'business'] &&
+      data.billingCycle in ['monthly', 'annual'] &&
+      data.amountCents is int && data.amountCents >= 0 && data.amountCents <= 1000000 &&
+      data.currency in ['USD'] &&
+      data.status in ['paid', 'refunded', 'void'] &&
+      data.paymentLast4 is string && data.paymentLast4.size() <= 4 &&
+      data.periodLabel is string && data.periodLabel.size() >= 1 && data.periodLabel.size() <= 64 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll([
+        'freeDailyLimit', 'maxFreeFileMb', 'maxProFileMb', 'maintenanceMode',
+        'disabledTools', 'proMonthlyPriceCents', 'proAnnualPriceCents',
+        'businessMonthlyPriceCents', 'businessAnnualPriceCents', 'updatedAt', 'updatedBy'
+      ]) &&
+      data.keys().hasOnly([
+        'freeDailyLimit', 'maxFreeFileMb', 'maxProFileMb', 'maintenanceMode',
+        'disabledTools', 'proMonthlyPriceCents', 'proAnnualPriceCents',
+        'businessMonthlyPriceCents', 'businessAnnualPriceCents', 'updatedAt', 'updatedBy'
+      ]) &&
+      data.freeDailyLimit is int && data.freeDailyLimit >= 1 && data.freeDailyLimit <= 100 &&
+      data.maxFreeFileMb is int && data.maxFreeFileMb >= 1 && data.maxFreeFileMb <= 500 &&
+      data.maxProFileMb is int && data.maxProFileMb >= 1 && data.maxProFileMb <= 2000 &&
+      data.maintenanceMode is bool &&
+      data.disabledTools is list && data.disabledTools.size() <= 8 &&
+      (data.disabledTools.size() == 0 || (data.disabledTools[0] is string && data.disabledTools[0].size() <= 32)) &&
+      data.proMonthlyPriceCents is int && data.proMonthlyPriceCents >= 100 && data.proMonthlyPriceCents <= 50000 &&
+      data.proAnnualPriceCents is int && data.proAnnualPriceCents >= 100 && data.proAnnualPriceCents <= 50000 &&
+      data.businessMonthlyPriceCents is int && data.businessMonthlyPriceCents >= 100 && data.businessMonthlyPriceCents <= 100000 &&
+      data.businessAnnualPriceCents is int && data.businessAnnualPriceCents >= 100 && data.businessAnnualPriceCents <= 100000 &&
+      data.updatedAt is timestamp &&
+      data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 128;
+    }
+
+    function isValidAdminGrant(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 256 &&
+        data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128 &&
+        data.createdAt is timestamp;
+    }
+
+    // Health check document for connection validation
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Users collection (PII isolated to owner or admin)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isVerified() && (resource.data.uid == request.auth.uid || isBootstrappedAdmin());
+
+      allow create: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        incoming().status == 'active' &&
+        (
+          isBootstrappedAdmin() || (
+            incoming().role == 'user' &&
+            incoming().plan == 'free' &&
+            incoming().dailyUsageCount == 0 &&
+            incoming().totalOperations == 0
+          )
+        );
+
+      allow update: if isValidId(userId) &&
+        isVerified() &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'role', 'plan', 'billingCycle', 'subscriptionStatus',
+              'status', 'dailyUsageDate', 'dailyUsageCount', 'updatedAt'
+            ])
+          ) ||
+          (
+            isOwner(userId) &&
+            existing().status == 'active' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'dailyUsageDate', 'dailyUsageCount', 'totalOperations',
+              'totalBytesProcessed', 'totalBytesSaved', 'updatedAt'
+            ])
+          ) ||
+          (
+            isOwner(userId) &&
+            existing().status == 'active' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'plan', 'billingCycle', 'subscriptionStatus',
+              'paymentMethodLast4', 'paymentMethodBrand', 'currentPeriodEnd', 'updatedAt'
+            ])
+          ) ||
+          (
+            isOwner(userId) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'photoURL', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Usage logs (append-only for users, readable by owner or bootstrapped admin)
+    match /usageLogs/{logId} {
+      allow get: if isValidId(logId) && isVerified() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isBootstrappedAdmin());
+
+      allow create: if isValidId(logId) &&
+        isVerified() &&
+        isValidUsageLog(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isValidId(logId) && isAdmin();
+    }
+
+    // Invoices (owner can create on checkout & read; terminal states locked; admin can refund/void)
+    match /invoices/{invoiceId} {
+      allow get: if isValidId(invoiceId) && isVerified() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isVerified() && (resource.data.userId == request.auth.uid || isBootstrappedAdmin());
+
+      allow create: if isValidId(invoiceId) &&
+        isVerified() &&
+        isValidInvoice(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'paid' &&
+        incoming().createdAt == request.time;
+
+      allow update: if isValidId(invoiceId) &&
+        isAdmin() &&
+        isValidInvoice(incoming()) &&
+        existing().status == 'paid' &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+
+      allow delete: if false;
+    }
+
+    // Global platform settings (publicly readable for limits/pricing, admin-only writes)
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if false;
+
+      allow create: if isValidId(settingId) &&
+        isAdmin() &&
+        isValidPlatformSettings(incoming()) &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(settingId) &&
+        isAdmin() &&
+        isValidPlatformSettings(incoming()) &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    // Trusted admin grants
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+
+      allow create: if isValidId(adminId) &&
+        isAdmin() &&
+        isValidAdminGrant(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isValidId(adminId) && isAdmin() && adminId != request.auth.uid;
+    }
+  }
+}
