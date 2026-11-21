@@ -920,3 +920,471 @@ export async function runImageConvert(
     zipItem,
   };
 }
+
+// 9. PDF to Excel (.xlsx / .csv)
+export interface PdfToExcelOptions {
+  format: 'xlsx' | 'csv';
+  sheetMode: 'combined' | 'per-page';
+  detectNumbers: boolean;
+}
+
+interface ExtractedCell {
+  x: number;
+  endX: number;
+  text: string;
+}
+
+interface ColumnBand {
+  minX: number;
+  maxX: number;
+  anchorX: number;
+}
+
+function escapeXmlText(value: string): string {
+  // Strip XML 1.0 disallowed control chars
+  // eslint-disable-next-line no-control-regex
+  const cleaned = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  return cleaned
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function sanitizeSheetName(raw: string, fallbackIndex: number): string {
+  const cleaned = raw.replace(/[\\/?*[\]:]/g, '_').trim();
+  if (!cleaned) return `Sheet_${fallbackIndex}`;
+  return cleaned.slice(0, 31);
+}
+
+function toExcelColName(zeroBasedIndex: number): string {
+  let n = zeroBasedIndex + 1;
+  let name = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return name;
+}
+
+function tryParseNumericCell(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  // Avoid converting leading-zero IDs like "0042" or dates like "2026-01-15"
+  if (/^0\d+/.test(trimmed)) return null;
+  if (!/^-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/.test(trimmed)) return null;
+  const normalized = trimmed.replace(/,/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function escapeCsvCell(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function rowsToCsvString(rows: string[][]): string {
+  return '\uFEFF' + rows.map((row) => row.map((c) => escapeCsvCell(c)).join(',')).join('\r\n');
+}
+
+async function buildXlsxBlob(
+  sheets: { name: string; rows: string[][] }[],
+  detectNumbers: boolean
+): Promise<Blob> {
+  const zip = new JSZip();
+
+  const sheetOverrides = sheets
+    .map(
+      (_, i) =>
+        `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
+    )
+    .join('');
+
+  zip.file(
+    '[Content_Types].xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-officedocument.relationships+xml"/>` +
+      `<Default Extension="xml" ContentType="application/xml"/>` +
+      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+      `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+      sheetOverrides +
+      `</Types>`
+  );
+
+  zip.file(
+    '_rels/.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+      `</Relationships>`
+  );
+
+  const sheetTags = sheets
+    .map(
+      (s, i) =>
+        `<sheet name="${escapeXmlText(sanitizeSheetName(s.name, i + 1))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`
+    )
+    .join('');
+
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      `<sheets>${sheetTags}</sheets>` +
+      `</workbook>`
+  );
+
+  const workbookRels = sheets
+    .map(
+      (_, i) =>
+        `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`
+    )
+    .join('');
+
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      workbookRels +
+      `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+      `</Relationships>`
+  );
+
+  zip.file(
+    'xl/styles.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+      `<fonts count="2">` +
+      `<font><sz val="11"/><name val="Calibri"/></font>` +
+      `<font><b/><sz val="11"/><color rgb="FF0F172A"/><name val="Calibri"/></font>` +
+      `</fonts>` +
+      `<fills count="3">` +
+      `<fill><patternFill patternType="none"/></fill>` +
+      `<fill><patternFill patternType="gray125"/></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/></patternFill></fill>` +
+      `</fills>` +
+      `<borders count="2">` +
+      `<border><left/><right/><top/><bottom/><diagonal/></border>` +
+      `<border><left/><right/><top/><bottom style="thin"><color rgb="FFCBD5E1"/></bottom><diagonal/></border>` +
+      `</borders>` +
+      `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+      `<cellXfs count="2">` +
+      `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+      `<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+      `</cellXfs>` +
+      `</styleSheet>`
+  );
+
+  sheets.forEach((sheet, sheetIdx) => {
+    const rows = sheet.rows.length > 0 ? sheet.rows : [['No extractable table text found']];
+    const maxCols = Math.max(1, ...rows.map((r) => r.length));
+    const colWidths = new Array<number>(maxCols).fill(12);
+
+    rows.forEach((row) => {
+      row.forEach((val, cIdx) => {
+        colWidths[cIdx] = Math.min(54, Math.max(colWidths[cIdx], val.length + 4));
+      });
+    });
+
+    const colsXml = colWidths
+      .map(
+        (w, i) =>
+          `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`
+      )
+      .join('');
+
+    const rowsXml = rows
+      .map((row, rIdx) => {
+        const rowNum = rIdx + 1;
+        // Highlight first multi-column row as header
+        const isHeaderRow = rIdx === 0 && row.filter(Boolean).length >= 2;
+        const styleAttr = isHeaderRow ? ' s="1"' : '';
+        const cellsXml = row
+          .map((val, cIdx) => {
+            if (val === '') return '';
+            const ref = `${toExcelColName(cIdx)}${rowNum}`;
+            if (detectNumbers && !isHeaderRow) {
+              const num = tryParseNumericCell(val);
+              if (num !== null) {
+                return `<c r="${ref}"${styleAttr} t="n"><v>${num}</v></c>`;
+              }
+            }
+            return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${escapeXmlText(val)}</t></is></c>`;
+          })
+          .filter(Boolean)
+          .join('');
+        return `<row r="${rowNum}">${cellsXml}</row>`;
+      })
+      .join('');
+
+    const sheetXml =
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+      `<cols>${colsXml}</cols>` +
+      `<sheetData>${rowsXml}</sheetData>` +
+      `</worksheet>`;
+
+    zip.file(`xl/worksheets/sheet${sheetIdx + 1}.xml`, sheetXml);
+  });
+
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+function alignPageRowsToColumns(rawRows: ExtractedCell[][]): string[][] {
+  if (rawRows.length === 0) return [];
+
+  // Build column bands primarily from multi-cell rows so wide single-line titles don't merge columns
+  const bands: ColumnBand[] = [];
+  const multiCellSeeds = rawRows
+    .filter((r) => r.length >= 2)
+    .flat()
+    .sort((a, b) => a.x - b.x);
+
+  const assignToBand = (cell: ExtractedCell, allowCreate: boolean): number => {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+
+    for (let i = 0; i < bands.length; i++) {
+      const b = bands[i];
+      const overlaps = cell.x <= b.maxX + 6 && cell.endX >= b.minX - 6;
+      const nearAnchor = Math.abs(cell.x - b.anchorX) <= 18;
+      if (overlaps || nearAnchor) {
+        const dist = Math.abs(cell.x - b.anchorX);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      }
+    }
+
+    if (bestIdx >= 0) {
+      bands[bestIdx].minX = Math.min(bands[bestIdx].minX, cell.x);
+      bands[bestIdx].maxX = Math.max(bands[bestIdx].maxX, cell.endX);
+      return bestIdx;
+    }
+
+    if (!allowCreate) return 0;
+
+    bands.push({ minX: cell.x, maxX: cell.endX, anchorX: cell.x });
+    bands.sort((a, b) => a.anchorX - b.anchorX);
+    return bands.findIndex((b) => b.anchorX === cell.x);
+  };
+
+  for (const seed of multiCellSeeds) {
+    assignToBand(seed, true);
+  }
+
+  if (bands.length === 0) {
+    return rawRows.map((row) => [row.map((c) => c.text).join(' ').trim()]).filter((r) => r[0] !== '');
+  }
+
+  bands.sort((a, b) => a.anchorX - b.anchorX);
+
+  const findColumnIndex = (cell: ExtractedCell, isSingleCellRow: boolean): number => {
+    if (isSingleCellRow) {
+      // Place wide page headers/notes into the nearest starting column without widening bands
+      let nearest = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < bands.length; i++) {
+        const d = Math.abs(cell.x - bands[i].anchorX);
+        if (d < minDist) {
+          minDist = d;
+          nearest = i;
+        }
+      }
+      return nearest;
+    }
+
+    let bestIdx = 0;
+    let bestScore = Infinity;
+    for (let i = 0; i < bands.length; i++) {
+      const b = bands[i];
+      const overlaps = cell.x <= b.maxX + 6 && cell.endX >= b.minX - 6;
+      const dist = Math.abs(cell.x - b.anchorX);
+      const score = overlaps ? dist : dist + 1000;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  };
+
+  const matrix: string[][] = [];
+  for (const row of rawRows) {
+    const cols = new Array<string>(bands.length).fill('');
+    const isSingle = row.length === 1;
+    for (const cell of row) {
+      const idx = findColumnIndex(cell, isSingle);
+      cols[idx] = cols[idx] ? `${cols[idx]} ${cell.text}` : cell.text;
+    }
+    if (cols.some((c) => c.trim() !== '')) {
+      matrix.push(cols.map((c) => c.trim()));
+    }
+  }
+
+  return matrix;
+}
+
+export async function runPdfToExcel(
+  file: File,
+  options: PdfToExcelOptions
+): Promise<ToolProcessResult> {
+  const started = performance.now();
+  const buffer = await file.arrayBuffer();
+  const baseName = stripExtension(file.name);
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const pdf = await loadingTask.promise;
+
+  const pageSheets: { name: string; rows: string[][] }[] = [];
+  let totalRows = 0;
+  let maxColumnsDetected = 1;
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const linesMap = new Map<number, { x: number; endX: number; str: string }[]>();
+
+    for (const rawItem of content.items) {
+      if (!('str' in rawItem) || !rawItem.str.trim()) continue;
+      const transform = rawItem.transform;
+      const x = transform[4] ?? 0;
+      const y = Math.round((transform[5] ?? 0) / 4) * 4;
+      const approxFont = Math.abs(transform[0] ?? transform[3] ?? 10) || 10;
+      const width =
+        typeof rawItem.width === 'number' && rawItem.width > 0
+          ? rawItem.width
+          : rawItem.str.length * approxFont * 0.52;
+
+      const bucket = linesMap.get(y) || [];
+      bucket.push({ x, endX: x + width, str: rawItem.str });
+      linesMap.set(y, bucket);
+    }
+
+    const sortedYs = Array.from(linesMap.keys()).sort((a, b) => b - a);
+    const rawRows: ExtractedCell[][] = [];
+
+    for (const y of sortedYs) {
+      const segments = (linesMap.get(y) || []).sort((a, b) => a.x - b.x);
+      const rowCells: ExtractedCell[] = [];
+
+      for (const seg of segments) {
+        const text = seg.str.trim();
+        if (!text) continue;
+        const prev = rowCells[rowCells.length - 1];
+        if (prev && seg.x - prev.endX <= 10) {
+          const gap = seg.x - prev.endX;
+          prev.text = gap > 1.5 ? `${prev.text} ${text}` : `${prev.text}${text}`;
+          prev.endX = Math.max(prev.endX, seg.endX);
+        } else {
+          rowCells.push({ x: seg.x, endX: seg.endX, text });
+        }
+      }
+
+      if (rowCells.length > 0) {
+        rawRows.push(rowCells);
+      }
+    }
+
+    const alignedRows = alignPageRowsToColumns(rawRows);
+    totalRows += alignedRows.length;
+    for (const r of alignedRows) {
+      maxColumnsDetected = Math.max(maxColumnsDetected, r.length);
+    }
+
+    pageSheets.push({
+      name: `Page_${pageNum}`,
+      rows: alignedRows,
+    });
+  }
+
+  const finalSheets =
+    options.sheetMode === 'combined'
+      ? [
+          {
+            name: 'Extracted_Data',
+            rows: pageSheets.flatMap((sheet, idx) =>
+              idx === 0 || sheet.rows.length === 0
+                ? sheet.rows
+                : [[''], ...sheet.rows]
+            ),
+          },
+        ]
+      : pageSheets;
+
+  const firstNonEmptySheet = finalSheets.find((s) => s.rows.length > 0) || finalSheets[0];
+  const previewRows = (firstNonEmptySheet?.rows || [])
+    .filter((r) => r.some((c) => c.trim() !== ''))
+    .slice(0, 14)
+    .map((r) => r.slice(0, 8));
+
+  const items: GeneratedOutputItem[] = [];
+  let zipItem: GeneratedOutputItem | undefined;
+  let totalOutputBytes = 0;
+
+  if (options.format === 'xlsx') {
+    const xlsxBlob = await buildXlsxBlob(finalSheets, options.detectNumbers);
+    items.push({
+      name: `${baseName}.xlsx`,
+      blob: xlsxBlob,
+      url: URL.createObjectURL(xlsxBlob),
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size: xlsxBlob.size,
+    });
+    totalOutputBytes = xlsxBlob.size;
+  } else {
+    for (const sheet of finalSheets) {
+      const csvText = rowsToCsvString(sheet.rows);
+      const csvBlob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+      const fileName =
+        finalSheets.length === 1
+          ? `${baseName}.csv`
+          : `${baseName}_${sheet.name.toLowerCase()}.csv`;
+      items.push({
+        name: fileName,
+        blob: csvBlob,
+        url: URL.createObjectURL(csvBlob),
+        mimeType: 'text/csv;charset=utf-8',
+        size: csvBlob.size,
+      });
+    }
+
+    totalOutputBytes = items.reduce((sum, item) => sum + item.size, 0);
+
+    if (items.length > 1) {
+      const zip = new JSZip();
+      for (const item of items) {
+        zip.file(item.name, item.blob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      zipItem = {
+        name: `${baseName}_spreadsheets.zip`,
+        blob: zipBlob,
+        url: URL.createObjectURL(zipBlob),
+        mimeType: 'application/zip',
+        size: zipBlob.size,
+      };
+      totalOutputBytes = zipBlob.size;
+    }
+  }
+
+  return {
+    toolId: 'pdf-to-excel',
+    primaryFileName: file.name,
+    inputBytes: file.size,
+    outputBytes: totalOutputBytes,
+    durationMs: Math.round(performance.now() - started),
+    summaryText: `Extracted ${totalRows} row${totalRows === 1 ? '' : 's'} across up to ${maxColumnsDetected} column${maxColumnsDetected === 1 ? '' : 's'} from ${pdf.numPages} page${pdf.numPages === 1 ? '' : 's'} as ${options.format.toUpperCase()}.`,
+    items,
+    zipItem,
+    tablePreview: previewRows.length > 0 ? previewRows : undefined,
+  };
+}

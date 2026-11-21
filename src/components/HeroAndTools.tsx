@@ -20,7 +20,7 @@ const TESTIMONIAL_IMAGE = '/src/assets/images/testimonial_ops_director_179524747
 const CATEGORIES: { id: ToolCategory; label: string }[] = [
   { id: 'all', label: 'All Tools' },
   { id: 'pdf', label: 'PDF Workflows' },
-  { id: 'office', label: 'Word & Office' },
+  { id: 'office', label: 'Word & Excel' },
   { id: 'image', label: 'Image Studio' },
 ];
 
@@ -129,10 +129,10 @@ export function HeroAndTools({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-10 mt-10 border-t border-slate-200">
             <div>
               <div className="font-mono text-2xl font-semibold text-slate-900 tabular-nums">
-                8 Tools
+                9 Tools
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                PDF, DOCX, and image pipelines
+                PDF, Word, Excel, and image pipelines
               </div>
             </div>
             <div>
@@ -202,7 +202,7 @@ export function HeroAndTools({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredTools.map((tool, index) => {
             const isDisabled =
               platformSettings.maintenanceMode ||
@@ -357,7 +357,7 @@ export function HeroAndTools({
               Need more than {platformSettings.freeDailyLimit} tasks a day?
             </h2>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Upgrade to Pro for unlimited daily conversions across all 8 tools, larger {platformSettings.maxProFileMb} MB file ceilings, full usage history, and priority support.
+              Upgrade to Pro for unlimited daily conversions across all 9 tools, larger {platformSettings.maxProFileMb} MB file ceilings, full usage history, and priority support.
             </p>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 text-xs text-slate-300">
               <span className="inline-flex items-center gap-1.5">

@@ -79,6 +79,17 @@ export const TOOLS_CATALOG: ToolDefinition[] = [
     iconName: 'FileCheck2',
   },
   {
+    id: 'pdf-to-excel',
+    name: 'PDF to Excel',
+    shortDesc: 'Extract structured tables and rows from PDF pages into an Excel (.xlsx) or CSV spreadsheet.',
+    category: 'office',
+    inputAccept: '.pdf,application/pdf',
+    inputLabel: 'PDF',
+    outputLabel: 'XLSX / CSV',
+    multiple: false,
+    iconName: 'Table2',
+  },
+  {
     id: 'image-convert',
     name: 'Image Converter',
     shortDesc: 'Convert and resize batches across PNG, JPG, and WebP with quality control.',

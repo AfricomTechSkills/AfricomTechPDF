@@ -35,8 +35,8 @@ export function PricingSection({
           Predictable pricing for individuals and teams
         </h1>
         <p className="text-sm sm:text-base text-slate-600">
-          Start free with {platformSettings.freeDailyLimit} operations per day across all 8 PDF and
-          image tools, or upgrade for unlimited daily runs and higher file limits.
+          Start free with {platformSettings.freeDailyLimit} operations per day across all 9 PDF,
+          Office, and image tools, or upgrade for unlimited daily runs and higher file limits.
         </p>
 
         <div className="inline-flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
@@ -95,7 +95,7 @@ export function PricingSection({
               </li>
               <li className="flex items-center gap-2.5">
                 <Check className="w-4 h-4 text-slate-500 shrink-0" />
-                <span>All 8 PDF, Word, and image tools</span>
+                <span>All 9 PDF, Word, Excel, and image tools</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Check className="w-4 h-4 text-slate-500 shrink-0" />
@@ -262,9 +262,9 @@ export function PricingSection({
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-slate-900">PDF &amp; Image Suite</td>
-                <td className="py-3.5 px-6">All 8 tools</td>
-                <td className="py-3.5 px-6">All 8 tools</td>
-                <td className="py-3.5 px-6">All 8 tools</td>
+                <td className="py-3.5 px-6">All 9 tools</td>
+                <td className="py-3.5 px-6">All 9 tools</td>
+                <td className="py-3.5 px-6">All 9 tools</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-slate-900">PDF to Image Max DPI</td>

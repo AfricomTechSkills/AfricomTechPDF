@@ -512,7 +512,7 @@ export async function adminSavePlatformSettings(
       maxFreeFileMb: Math.min(500, Math.max(1, Math.round(settings.maxFreeFileMb))),
       maxProFileMb: Math.min(2000, Math.max(1, Math.round(settings.maxProFileMb))),
       maintenanceMode: Boolean(settings.maintenanceMode),
-      disabledTools: settings.disabledTools.slice(0, 8),
+      disabledTools: settings.disabledTools.slice(0, 9),
       proMonthlyPriceCents: Math.max(100, Math.round(settings.proMonthlyPriceCents)),
       proAnnualPriceCents: Math.max(100, Math.round(settings.proAnnualPriceCents)),
       businessMonthlyPriceCents: Math.max(100, Math.round(settings.businessMonthlyPriceCents)),

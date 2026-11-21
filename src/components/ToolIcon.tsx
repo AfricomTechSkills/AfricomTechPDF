@@ -7,6 +7,7 @@ import {
   Minimize2,
   RefreshCw,
   Scissors,
+  Table2,
 } from 'lucide-react';
 
 export function ToolIcon({ name, className = 'w-5 h-5' }: { name: string; className?: string }) {
@@ -25,6 +26,8 @@ export function ToolIcon({ name, className = 'w-5 h-5' }: { name: string; classN
       return <FileText className={className} />;
     case 'FileCheck2':
       return <FileCheck2 className={className} />;
+    case 'Table2':
+      return <Table2 className={className} />;
     case 'RefreshCw':
       return <RefreshCw className={className} />;
     default:

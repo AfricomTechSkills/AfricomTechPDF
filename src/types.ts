@@ -8,6 +8,7 @@ export type ToolId =
   | 'image-to-pdf'
   | 'pdf-to-word'
   | 'word-to-pdf'
+  | 'pdf-to-excel'
   | 'image-convert';
 
 export type ToolCategory = 'all' | 'pdf' | 'office' | 'image';
@@ -119,4 +120,5 @@ export interface ToolProcessResult {
   items: GeneratedOutputItem[];
   zipItem?: GeneratedOutputItem;
   extractedTextPreview?: string;
+  tablePreview?: string[][];
 }

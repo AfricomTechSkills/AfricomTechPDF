@@ -94,7 +94,7 @@ service cloud.firestore {
       data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 256 &&
       data.toolId in [
         'merge-pdf', 'split-pdf', 'compress-pdf', 'pdf-to-image',
-        'image-to-pdf', 'pdf-to-word', 'word-to-pdf', 'image-convert'
+        'image-to-pdf', 'pdf-to-word', 'word-to-pdf', 'pdf-to-excel', 'image-convert'
       ] &&
       data.toolName is string && data.toolName.size() >= 1 && data.toolName.size() <= 64 &&
       data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 256 &&
@@ -145,7 +145,7 @@ service cloud.firestore {
       data.maxFreeFileMb is int && data.maxFreeFileMb >= 1 && data.maxFreeFileMb <= 500 &&
       data.maxProFileMb is int && data.maxProFileMb >= 1 && data.maxProFileMb <= 2000 &&
       data.maintenanceMode is bool &&
-      data.disabledTools is list && data.disabledTools.size() <= 8 &&
+      data.disabledTools is list && data.disabledTools.size() <= 9 &&
       (data.disabledTools.size() == 0 || (data.disabledTools[0] is string && data.disabledTools[0].size() <= 32)) &&
       data.proMonthlyPriceCents is int && data.proMonthlyPriceCents >= 100 && data.proMonthlyPriceCents <= 50000 &&
       data.proAnnualPriceCents is int && data.proAnnualPriceCents >= 100 && data.proAnnualPriceCents <= 50000 &&

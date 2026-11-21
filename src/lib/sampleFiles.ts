@@ -160,6 +160,72 @@ async function buildSampleDocx(name: string): Promise<File> {
   });
 }
 
+async function buildSampleTablePdf(name: string): Promise<File> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const pagesData: string[][][] = [
+    [
+      ['Date', 'Department', 'Vendor', 'Category', 'Units', 'Amount'],
+      ['2026-01-08', 'Operations', 'Africom Cloud Services', 'Infrastructure', '12', '1,450.00'],
+      ['2026-01-14', 'Design Studio', 'Northbridge Print Co', 'Proofing Stock', '40', '620.50'],
+      ['2026-01-21', 'Finance', 'LedgerPro Systems', 'Audit Licenses', '5', '890.00'],
+      ['2026-02-03', 'Engineering', 'Vertex Security Labs', 'Penetration Test', '1', '2,400.00'],
+      ['2026-02-11', 'Legal', 'ClearSign Compliance', 'Document Filing', '18', '540.75'],
+    ],
+    [
+      ['Date', 'Department', 'Vendor', 'Category', 'Units', 'Amount'],
+      ['2026-02-19', 'Operations', 'Metro Courier Express', 'Archival Freight', '9', '315.20'],
+      ['2026-03-04', 'Marketing', 'Studio Type Foundry', 'Webfont License', '3', '480.00'],
+      ['2026-03-16', 'Engineering', 'FastEdge CDN', 'Bandwidth Overage', '25', '760.40'],
+      ['2026-03-27', 'Finance', 'Summit Tax Advisory', 'Q1 Reconciliation', '1', '1,950.00'],
+    ],
+  ];
+
+  const colX = [46, 120, 206, 336, 434, 492];
+
+  pagesData.forEach((rows, pIdx) => {
+    const page = doc.addPage(PageSizes.A4);
+    const { width, height } = page.getSize();
+
+    page.drawText(`PDF Convert - Quarterly Expense Ledger (Page ${pIdx + 1})`, {
+      x: 46,
+      y: height - 64,
+      size: 14,
+      font: bold,
+      color: rgb(0.06, 0.09, 0.16),
+    });
+
+    rows.forEach((row, rIdx) => {
+      const y = height - 116 - rIdx * 28;
+      if (rIdx === 0) {
+        page.drawRectangle({
+          x: 40,
+          y: y - 7,
+          width: width - 80,
+          height: 24,
+          color: rgb(0.95, 0.96, 0.98),
+        });
+      }
+      row.forEach((cell, cIdx) => {
+        page.drawText(cell, {
+          x: colX[cIdx],
+          y,
+          size: 10,
+          font: rIdx === 0 ? bold : font,
+          color: rgb(0.1, 0.14, 0.22),
+        });
+      });
+    });
+  });
+
+  const bytes = await doc.save();
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new File([copy.buffer], name, { type: 'application/pdf' });
+}
+
 export async function generateSampleFilesForTool(toolId: ToolId): Promise<File[]> {
   switch (toolId) {
     case 'merge-pdf':
@@ -182,6 +248,8 @@ export async function generateSampleFilesForTool(toolId: ToolId): Promise<File[]
       return [await buildSamplePdf('Contract_Clause_Draft.pdf', 'Service Agreement', 2)];
     case 'word-to-pdf':
       return [await buildSampleDocx('Operations_Brief.docx')];
+    case 'pdf-to-excel':
+      return [await buildSampleTablePdf('Quarterly_Expense_Ledger.pdf')];
     case 'image-convert':
       return [await buildSampleImage('Studio_Banner.png', 'Studio Asset Export', '#E11D48')];
   }

@@ -125,6 +125,7 @@
             "image-to-pdf",
             "pdf-to-word",
             "word-to-pdf",
+            "pdf-to-excel",
             "image-convert"
           ]
         },
